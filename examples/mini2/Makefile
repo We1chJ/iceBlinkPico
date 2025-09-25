@@ -1,4 +1,4 @@
-filename = mini1
+filename = mini2
 pcf_file = ../common/iceBlinkPico.pcf
 
 build:

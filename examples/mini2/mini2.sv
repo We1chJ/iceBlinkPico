@@ -56,32 +56,26 @@ module top(
         
         // HSV to RGB conversion with fixed Saturation=100%, Value=100%
         if (hue < 60) begin
-            // Red to Yellow transition (0-60°)
             R = 8'd255;
             G = (hue * 255) / 60;
             B = 8'd0;
         end else if (hue < 120) begin
-            // Yellow to Green transition (60-120°)
             R = ((120 - hue) * 255) / 60;
             G = 8'd255;
             B = 8'd0;
         end else if (hue < 180) begin
-            // Green to Cyan transition (120-180°)
             R = 8'd0;
             G = 8'd255;
             B = ((hue - 120) * 255) / 60;
         end else if (hue < 240) begin
-            // Cyan to Blue transition (180-240°)
             R = 8'd0;
             G = ((240 - hue) * 255) / 60;
             B = 8'd255;
         end else if (hue < 300) begin
-            // Blue to Magenta transition (240-300°)
             R = ((hue - 240) * 255) / 60;
             G = 8'd0;
             B = 8'd255;
         end else begin
-            // Magenta to Red transition (300-360°)
             R = 8'd255;
             G = 8'd0;
             B = ((360 - hue) * 255) / 60;
