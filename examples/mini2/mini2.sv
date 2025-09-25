@@ -15,9 +15,9 @@ module top(
 	logic pwm_out_g;
 	logic pwm_out_b;
 	
-	logic [31:0] pwm_value_r = PWM_INTERVAL;
-	logic [31:0] pwm_value_g = 0;
-	logic [31:0] pwm_value_b = 0;
+	logic [$clog2(PWM_INTERVAL) - 1:0] pwm_value_r = PWM_INTERVAL;
+	logic [$clog2(PWM_INTERVAL) - 1:0] pwm_value_g = 0;
+	logic [$clog2(PWM_INTERVAL) - 1:0] pwm_value_b = 0;
 
 	// Red PWM instance
 	pwm #(
@@ -47,46 +47,51 @@ module top(
 	);
 
 
-	logic [31:0] hue;    // 32 bits enough for (360 * ONE_SEC_INTERVAL)
-	logic [7:0] R, G, B;
+	logic [$clog2(360)-1:0] hue;    // 0-360
+	logic [$clog2(255)-1:0] R, G, B; // 0-255
 
 	// combinational part: compute hue -> x -> R,G,B
 	always_comb begin
 		hue = (360 * time_counter) / ONE_SEC_INTERVAL;
         
-        // HSV to RGB conversion with fixed Saturation=100%, Value=100%
+        // HSV to RGB conversion with fixed full S and V
         if (hue < 60) begin
-            R = 8'd255;
+            R = 255;
             G = (hue * 255) / 60;
-            B = 8'd0;
+            B = 0;
         end else if (hue < 120) begin
             R = ((120 - hue) * 255) / 60;
-            G = 8'd255;
-            B = 8'd0;
+            G = 255;
+            B = 0;
         end else if (hue < 180) begin
-            R = 8'd0;
-            G = 8'd255;
+            R = 0;
+            G = 255;
             B = ((hue - 120) * 255) / 60;
         end else if (hue < 240) begin
-            R = 8'd0;
+            R = 0;
             G = ((240 - hue) * 255) / 60;
-            B = 8'd255;
+            B = 255;
         end else if (hue < 300) begin
             R = ((hue - 240) * 255) / 60;
-            G = 8'd0;
-            B = 8'd255;
+            G = 0;
+            B = 255;
         end else begin
-            R = 8'd255;
-            G = 8'd0;
+            R = 255;
+            G = 0;
             B = ((360 - hue) * 255) / 60;
         end
 
+		// convert final RGB value into PWM value
 		pwm_value_r = (R * PWM_INTERVAL) / 255;
 		pwm_value_g = (G * PWM_INTERVAL) / 255;
 		pwm_value_b = (B * PWM_INTERVAL) / 255;
+
+		RGB_R = ~pwm_out_r;
+		RGB_G = ~pwm_out_g;
+		RGB_B = ~pwm_out_b;
 	end
 
-	// sequential part: update time counter and output PWM
+	// sequential part: update time counter whenever at positive edge
 	always_ff @(posedge clk) begin
 		if (time_counter == ONE_SEC_INTERVAL - 1) begin
 			time_counter <= 0;
@@ -95,10 +100,5 @@ module top(
 			time_counter <= time_counter + 1;
 		end
 	end
-
-	
-	assign RGB_R = ~pwm_out_r;
-	assign RGB_G = ~pwm_out_g;
-	assign RGB_B = ~pwm_out_b;
 
 endmodule
