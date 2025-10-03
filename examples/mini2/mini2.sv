@@ -85,10 +85,6 @@ module top(
 		pwm_value_r = (R * PWM_INTERVAL) / 255;
 		pwm_value_g = (G * PWM_INTERVAL) / 255;
 		pwm_value_b = (B * PWM_INTERVAL) / 255;
-
-		RGB_R = ~pwm_out_r;
-		RGB_G = ~pwm_out_g;
-		RGB_B = ~pwm_out_b;
 	end
 
 	// sequential part: update time counter whenever at positive edge
@@ -100,5 +96,10 @@ module top(
 			time_counter <= time_counter + 1;
 		end
 	end
+
+	// account for active low design for the LED
+	assign RGB_R = ~pwm_out_r;
+	assign RGB_G = ~pwm_out_g;
+	assign RGB_B = ~pwm_out_b;
 
 endmodule
