@@ -8,93 +8,139 @@ module top(
 );
 	// CLK frequency is 12MHz, so 6,000,000 cycles is 0.5s
 	parameter ONE_SEC_INTERVAL = 12000000; // 1s
-	parameter PWM_INTERVAL = 1200;       // CLK frequency is 12MHz, so 1,200 cycles is 100us
-	logic [$clog2(ONE_SEC_INTERVAL)-1:0] time_counter = 0;
-	
-	logic pwm_out_r;
-	logic pwm_out_g;
-	logic pwm_out_b;
-	
-	logic [$clog2(PWM_INTERVAL) - 1:0] pwm_value_r = PWM_INTERVAL;
-	logic [$clog2(PWM_INTERVAL) - 1:0] pwm_value_g = 0;
-	logic [$clog2(PWM_INTERVAL) - 1:0] pwm_value_b = 0;
+	parameter COLOR_CHANGE_INTERVAL = ONE_SEC_INTERVAL/6;     // color changing interval, 1/6 of a full second
+    parameter PWM_INTERVAL = 1200;          // CLK frequency is 12MHz, so 1,200 cycles is 100us
+	parameter INC_DEC_MAX = 255; // incrementing/decrementing up to a full color scale (0-255)
+    parameter INC_DEC_VAL = PWM_INTERVAL / INC_DEC_MAX; // how much to inc/dec evenly every interval on the pwm value
+	parameter INC_DEC_INTERVAL = COLOR_CHANGE_INTERVAL / INC_DEC_MAX; // how long would the inc/dec take to evenly update the pwm in one color cycle (1/6 of a second)
+	parameter COLOR_CYCLE = 6; // 6 color sections
 
-	// Red PWM instance
+	// Define state variable values
+    localparam PWM_INC = 1'b0;
+    localparam PWM_DEC = 1'b1;
+
+	// Declare state variables
+    logic current_state = PWM_INC;
+    logic next_state;
+	
+	// Declare variables for timing state transitions
+    logic [$clog2(COLOR_CHANGE_INTERVAL) - 1:0] count = 0;
+    logic [$clog2(PWM_INTERVAL) - 1:0] pwm_value = 0;
+	logic [$clog2(COLOR_CYCLE) - 1:0] color_counter = 0;
+	// Counter for INC_DEC_INTERVAL
+	logic [$clog2(INC_DEC_INTERVAL)-1:0] inc_dec_count = 0;
+
+    logic time_to_transition = 1'b0;
+
+	initial begin
+        pwm_value = 0;
+    end
+
+	// Register the next state of the FSM
+    always_ff @(posedge time_to_transition)
+        current_state <= next_state;
+
+	// Compute the next state of the FSM
+    always_comb begin
+        next_state = 1'bx;
+        case (current_state)
+            PWM_INC:
+                next_state = PWM_DEC;
+            PWM_DEC:
+                next_state = PWM_INC;
+        endcase
+    end
+
+	// Implement counter for transitioning from one color to the next one
+    always_ff @(posedge clk) begin
+        if (count == COLOR_CHANGE_INTERVAL - 1) begin
+            count <= 0;
+            time_to_transition <= 1'b1;
+			if (color_counter == COLOR_CYCLE-1) begin
+				color_counter <= 0;
+			end
+			else begin
+				color_counter <= color_counter + 1;
+			end
+        end
+        else begin
+            count <= count + 1;
+            time_to_transition <= 1'b0;
+        end
+    end
+
+	always_ff @(posedge clk) begin
+		if (inc_dec_count == INC_DEC_INTERVAL - 1) begin
+			inc_dec_count <= 0;
+			case (current_state)
+				PWM_INC:
+					pwm_value <= pwm_value + INC_DEC_VAL;
+				PWM_DEC:
+					pwm_value <= pwm_value - INC_DEC_VAL;
+			endcase
+		end else begin
+			inc_dec_count <= inc_dec_count + 1;
+		end
+	end
+
+	// input the fading pwm_value and outputing the raw pwm_out for R or G or B
+	logic pwm_out;
 	pwm #(
 		.PWM_INTERVAL (PWM_INTERVAL)
 	) u1 (
 		.clk (clk),
-		.pwm_value (pwm_value_r),
-		.pwm_out (pwm_out_r)
+		.pwm_value (pwm_value),
+		.pwm_out (pwm_out)
 	);
 
-	// Green PWM instance
-	pwm #(
-		.PWM_INTERVAL (PWM_INTERVAL)
-	) u2 (
-		.clk (clk),
-		.pwm_value (pwm_value_g),
-		.pwm_out (pwm_out_g)
-	);
-
-	// Blue PWM instance
-	pwm #(
-		.PWM_INTERVAL (PWM_INTERVAL)
-	) u3 (
-		.clk (clk),
-		.pwm_value (pwm_value_b),
-		.pwm_out (pwm_out_b)
-	);
-
-
-	logic [$clog2(360)-1:0] hue;    // 0-360
-	logic [$clog2(255)-1:0] R, G, B; // 0-255
-
-	// combinational part: compute hue -> x -> R,G,B
-	always_comb begin
-		hue = (360 * time_counter) / ONE_SEC_INTERVAL;
-        
-        // HSV to RGB conversion with fixed full S and V
-        if (hue < 60) begin
-            R = 255;
-            G = (hue * 255) / 60;
-            B = 0;
-        end else if (hue < 120) begin
-            R = ((120 - hue) * 255) / 60;
-            G = 255;
-            B = 0;
-        end else if (hue < 180) begin
-            R = 0;
-            G = 255;
-            B = ((hue - 120) * 255) / 60;
-        end else if (hue < 240) begin
-            R = 0;
-            G = ((240 - hue) * 255) / 60;
-            B = 255;
-        end else if (hue < 300) begin
-            R = ((hue - 240) * 255) / 60;
-            G = 0;
-            B = 255;
-        end else begin
-            R = 255;
-            G = 0;
-            B = ((360 - hue) * 255) / 60;
-        end
-
-		// convert final RGB value into PWM value
-		pwm_value_r = (R * PWM_INTERVAL) / 255;
-		pwm_value_g = (G * PWM_INTERVAL) / 255;
-		pwm_value_b = (B * PWM_INTERVAL) / 255;
+	// PWM values for each color channel
+	logic pwm_out_r, pwm_out_g, pwm_out_b;
+	initial begin
+		// initialize r to 1
+		pwm_out_r = 1;
+		pwm_out_g = 0;
+		pwm_out_b = 0;
 	end
 
-	// sequential part: update time counter whenever at positive edge
-	always_ff @(posedge clk) begin
-		if (time_counter == ONE_SEC_INTERVAL - 1) begin
-			time_counter <= 0;
-	    end 
-		else begin
-			time_counter <= time_counter + 1;
-		end
+	// Assign PWM values based on color_counter state
+	always_comb begin
+		case (color_counter)
+			0: begin // Red up
+				pwm_out_r = 1;
+				pwm_out_g = pwm_out;
+				pwm_out_b = 0;
+			end
+			1: begin // Yellow
+				pwm_out_r = pwm_out;
+				pwm_out_g = 1;
+				pwm_out_b = 0;
+			end
+			2: begin // Green up, Red down
+				pwm_out_r = 0;
+				pwm_out_g = 1;
+				pwm_out_b = pwm_out;
+			end
+			3: begin // Green max, Blue up
+				pwm_out_r = 0;
+				pwm_out_g = pwm_out;
+				pwm_out_b = 1;
+			end
+			4: begin // Cyan (Green down, Blue up)
+				pwm_out_r = pwm_out;
+				pwm_out_g = 0;
+				pwm_out_b = 1;
+			end
+			5: begin // Blue down
+				pwm_out_r = 1;
+				pwm_out_g = 0;
+				pwm_out_b = pwm_out;
+			end
+			default: begin
+				pwm_out_r = 0;
+				pwm_out_g = 0;
+				pwm_out_b = 0;
+			end
+		endcase
 	end
 
 	// account for active low design for the LED
