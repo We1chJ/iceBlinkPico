@@ -4,7 +4,7 @@ module controller (
     output logic load_sreg, 
     output logic transmit_pixel, 
     output logic [5:0] pixel, 
-    output logic [4:0] frame
+    output logic next_frame,
 );
 
     localparam TRANSMIT_FRAME       = 1'b0;
@@ -15,9 +15,12 @@ module controller (
     localparam [2:0] TRANSMIT_PIXEL = 3'b100;
 
     localparam [8:0] TRANSMIT_CYCLES    = 9'd360;       // = 24 bits / pixel x 15 cycles / bit
-    localparam [19:0] IDLE_CYCLES       = 20'd351832;   // = 375000 - 64 x (360 + 2) for 32 frames / second
+    // localparam [19:0] IDLE_CYCLES       = 20'd351832;   // = 375000 - 64 x (360 + 2) for 32 frames / second
+    // 12 000000 / 32 = 375000
+    localparam [21:0] IDLE_CYCLES       = 22'd3976832;   // = 4000000 - 64 x (360 + 2) for 3 frames / second
 
-    // 375000 is sec/frame    
+    
+    // 375000 is sec/frame
     // 1/32fps = sec/frame
 
     logic state = TRANSMIT_FRAME;
@@ -26,13 +29,14 @@ module controller (
     logic [2:0] transmit_phase = READ_CH_VALS;
     logic [2:0] next_transmit_phase;
 
+    // pixels 
     logic [5:0] pixel_counter = 6'd0;
-    logic [4:0] frame_counter = 5'd0;
     logic [8:0] transmit_counter = 9'd0;
-    logic [19:0] idle_counter = 20'd0;
+    logic [21:0] idle_counter = 22'd0;
 
     logic transmit_pixel_done;
     logic idle_done;
+    logic next_frame_ff = 0;
 
     assign transmit_pixel_done = (transmit_counter == TRANSMIT_CYCLES - 1);
     assign idle_done = (idle_counter == IDLE_CYCLES - 1);
@@ -95,15 +99,17 @@ module controller (
 
     always_ff @(negedge clk) begin
         if (state == IDLE) begin
+            next_frame_ff <= 1;
             idle_counter <= idle_counter + 1;
         end
         else begin
+            next_frame_ff <= 0;
             idle_counter <= 20'd0;
         end
     end
 
     assign pixel = pixel_counter;
-    assign frame = frame_counter;
+    assign next_frame = next_frame_ff;
 
     assign load_sreg = (transmit_phase == LOAD_SREG);
     assign transmit_pixel = (transmit_phase == TRANSMIT_PIXEL);
