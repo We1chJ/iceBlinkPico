@@ -6,6 +6,7 @@ module gol#(
     input logic computing,
     input logic [5:0] compute_idx,
     input logic buffer_select,
+    input logic [2:0] neighbor_idx,
     output logic [7:0] data
 );
 
@@ -19,50 +20,79 @@ module gol#(
         $readmemh(INIT_FILE, buffer1);
     end
 
+    // Accumulator for alive neighbors
+    logic [3:0] cnt = 4'd0;
+
+    // counting all neighbors in one cycle would exceed FPGA resources
+    // therefore we will the neighbor in each clock cycle
+    // overall for one color, this would take 64 * 8 clock cycles
     always_ff @(posedge clk) begin
         if (computing) begin
-            integer i, j, cnt;
+            integer i, j;
+            logic [5:0] check_idx;
+            logic is_alive;
             i = compute_idx / 8;
             j = compute_idx % 8;
-            cnt = 0;
+            
+            // Determine which neighbor to check
+            unique case (neighbor_idx)
+                3'd0: check_idx = i*8 + ((j+1) % 8);                    // right
+                3'd1: check_idx = i*8 + ((j+7) % 8);                    // left
+                3'd2: check_idx = ((i+1) % 8) * 8 + j;                  // down
+                3'd3: check_idx = ((i+7) % 8) * 8 + j;                  // up
+                3'd4: check_idx = ((i+7) % 8) * 8 + ((j+7) % 8);       // up-left
+                3'd5: check_idx = ((i+7) % 8) * 8 + ((j+1) % 8);       // up-right
+                3'd6: check_idx = ((i+1) % 8) * 8 + ((j+7) % 8);       // down-left
+                3'd7: check_idx = ((i+1) % 8) * 8 + ((j+1) % 8);       // down-right
+            endcase
             
             if (buffer_select) begin
                 // Read from buffer1, write to buffer0
-                // Cardinal neighbors
-                if (buffer1[i*8 + ((j+1) % 8)] != 8'd0) cnt = cnt + 1;
-                if (buffer1[i*8 + ((j+7) % 8)] != 8'd0) cnt = cnt + 1;
-                if (buffer1[((i+1) % 8) * 8 + j] != 8'd0) cnt = cnt + 1;
-                if (buffer1[((i+7) % 8) * 8 + j] != 8'd0) cnt = cnt + 1;
-                // Diagonal neighbors
-                if (buffer1[((i+7) % 8) * 8 + ((j+7) % 8)] != 8'd0) cnt = cnt + 1;
-                if (buffer1[((i+7) % 8) * 8 + ((j+1) % 8)] != 8'd0) cnt = cnt + 1;
-                if (buffer1[((i+1) % 8) * 8 + ((j+7) % 8)] != 8'd0) cnt = cnt + 1;
-                if (buffer1[((i+1) % 8) * 8 + ((j+1) % 8)] != 8'd0) cnt = cnt + 1;
-
-                if (cnt <= 1 || cnt >= 4)
-                    buffer0[compute_idx] <= 8'd0;
-                else if (cnt == 2)
-                    buffer0[compute_idx] <= buffer1[compute_idx];
-                else // cnt == 3
-                    buffer0[compute_idx] <= 8'd255;
+                is_alive = (buffer1[check_idx] != 8'd0);
+                
+                if (neighbor_idx == 3'd0) begin
+                    // First neighbor - reset count and save current cell
+                    cnt <= is_alive ? 4'd1 : 4'd0;
+                end
+                else if (neighbor_idx == 3'd7) begin
+                    // Last neighbor - add to count first, THEN apply rules
+                    logic [3:0] final_count;
+                    // can't use <= non-blocking assignment because it will delay the calculation after the clock cycle
+                    final_count = cnt + (is_alive ? 4'd1 : 4'd0);
+                    
+                    if (final_count <= 4'd1 || final_count >= 4'd4)
+                        buffer0[compute_idx] <= 8'd0;
+                    else if (final_count == 4'd2)
+                        buffer0[compute_idx] <= buffer1[compute_idx];
+                    else // final_count == 3
+                        buffer0[compute_idx] <= 8'd255;
+                end
+                else begin
+                    // Middle neighbors - accumulate
+                    cnt <= cnt + (is_alive ? 4'd1 : 4'd0);
+                end
             end
             else begin
                 // Read from buffer0, write to buffer1
-                if (buffer0[i*8 + ((j+1) % 8)] != 8'd0) cnt = cnt + 1;
-                if (buffer0[i*8 + ((j+7) % 8)] != 8'd0) cnt = cnt + 1;
-                if (buffer0[((i+1) % 8) * 8 + j] != 8'd0) cnt = cnt + 1;
-                if (buffer0[((i+7) % 8) * 8 + j] != 8'd0) cnt = cnt + 1;
-                if (buffer0[((i+7) % 8) * 8 + ((j+7) % 8)] != 8'd0) cnt = cnt + 1;
-                if (buffer0[((i+7) % 8) * 8 + ((j+1) % 8)] != 8'd0) cnt = cnt + 1;
-                if (buffer0[((i+1) % 8) * 8 + ((j+7) % 8)] != 8'd0) cnt = cnt + 1;
-                if (buffer0[((i+1) % 8) * 8 + ((j+1) % 8)] != 8'd0) cnt = cnt + 1;
-
-                if (cnt <= 1 || cnt >= 4)
-                    buffer1[compute_idx] <= 8'd0;
-                else if (cnt == 2)
-                    buffer1[compute_idx] <= buffer0[compute_idx];
-                else // cnt == 3
-                    buffer1[compute_idx] <= 8'd255;
+                is_alive = (buffer0[check_idx] != 8'd0);
+                
+                if (neighbor_idx == 3'd0) begin
+                    cnt <= is_alive ? 4'd1 : 4'd0;
+                end
+                else if (neighbor_idx == 3'd7) begin
+                    logic [3:0] final_count;
+                    final_count = cnt + (is_alive ? 4'd1 : 4'd0);
+                    
+                    if (final_count <= 4'd1 || final_count >= 4'd4)
+                        buffer1[compute_idx] <= 8'd0;
+                    else if (final_count == 4'd2)
+                        buffer1[compute_idx] <= buffer0[compute_idx];
+                    else // final_count == 3
+                        buffer1[compute_idx] <= 8'd255;
+                end
+                else begin
+                    cnt <= cnt + (is_alive ? 4'd1 : 4'd0);
+                end
             end
         end
     end

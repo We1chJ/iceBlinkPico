@@ -32,6 +32,7 @@ module top(
     // State machine for sequential processing
     logic computing = 1'b0;
     logic [5:0] compute_idx = 6'd0;
+    logic [2:0] neighbor_idx = 3'd0; // 8 neighbors total
 
     gol #(
         .INIT_FILE  ("spiral/red.txt")
@@ -41,8 +42,31 @@ module top(
         .computing  (computing),
         .compute_idx(compute_idx),
         .buffer_select(buffer_select),
+        .neighbor_idx(neighbor_idx),
         .data       (red_data)
     );
+
+    // gol #(
+    //     .INIT_FILE ("spiral/green.txt")
+    // ) u2 (
+    //     .clk        (clk),
+    //     .address    (pixel),
+    //     .computing  (computing),
+    //     .compute_idx(compute_idx),
+    //     .buffer_select(buffer_select),
+    //     .data       (green_data)
+    // );
+
+    // gol #(
+    //     .INIT_FILE ("spiral/blue.txt")
+    // ) u3 (
+    //     .clk        (clk),
+    //     .address    (pixel),
+    //     .computing  (computing),
+    //     .compute_idx(compute_idx),
+    //     .buffer_select(buffer_select),
+    //     .data       (blue_data)
+    // );
 
     // Instance the WS2812B output driver
     ws2812b u4 (
@@ -72,15 +96,25 @@ module top(
         if (next_frame && !next_frame_prev && !computing) begin
             computing <= 1'b1;
             compute_idx <= 6'd0;
+            neighbor_idx <= 3'd0;
         end
-        if (computing) begin
-            // Move to next cell or finish
-            if (compute_idx == 6'd63) begin
-                computing <= 1'b0;
-                // flip the buffer to switch the whole display
-                buffer_select <= ~buffer_select;
+        else if (computing) begin
+            if (neighbor_idx == 3'd7) begin
+                // After processing the 8th neighbor
+                if (compute_idx == 6'd63) begin
+                    // Finished processing all cells
+                    computing <= 1'b0;
+                    neighbor_idx <= 3'd0;
+                    // flip the buffer to switch the whole display
+                    buffer_select <= ~buffer_select;
+                end else begin
+                    // Move to next cell
+                    neighbor_idx <= 3'd0;
+                    compute_idx <= compute_idx + 6'd1;
+                end
             end else begin
-                compute_idx <= compute_idx + 6'd1;
+                // Move to next neighbor
+                neighbor_idx <= neighbor_idx + 3'd1;
             end
         end
     end
@@ -88,8 +122,8 @@ module top(
     // Load shift register with pixel data
     always_ff @(posedge clk) begin
         if (load_sreg) begin
-            // shift_reg <= { green_data, red_data, 8'd0 };
-            shift_reg <= { 8'd0, red_data, 8'd0 };
+            shift_reg <= { green_data, red_data, blue_data };
+            // shift_reg <= { 8'd0, red_data, 8'd0 };
         end
         else if (shift) begin
             shift_reg <= { shift_reg[22:0], 1'b0 };
