@@ -10,9 +10,9 @@ module gol#(
     output logic [7:0] data
 );
 
-    // Requires 2 buffers to avoid modifying the matrix being displayed directly
-    logic [7:0] buffer0 [0:63];
-    logic [7:0] buffer1 [0:63];
+    // Single-bit cells instead of 8-bit
+    logic buffer0 [0:63];
+    logic buffer1 [0:63];
 
     // Initialize both buffers for cur frame and next frame
     initial if(INIT_FILE) begin
@@ -22,6 +22,7 @@ module gol#(
 
     // Accumulator for alive neighbors
     logic [3:0] cnt = 4'd0;
+    logic current_cell;
 
     // counting all neighbors in one cycle would exceed FPGA resources
     // therefore we will the neighbor in each clock cycle
@@ -48,24 +49,24 @@ module gol#(
             
             if (buffer_select) begin
                 // Read from buffer1, write to buffer0
-                is_alive = (buffer1[check_idx] != 8'd0);
+                is_alive = buffer1[check_idx];
                 
                 if (neighbor_idx == 3'd0) begin
                     // First neighbor - reset count and save current cell
                     cnt <= is_alive ? 4'd1 : 4'd0;
+                    current_cell <= buffer1[compute_idx];
                 end
                 else if (neighbor_idx == 3'd7) begin
                     // Last neighbor - add to count first, THEN apply rules
                     logic [3:0] final_count;
-                    // can't use <= non-blocking assignment because it will delay the calculation after the clock cycle
                     final_count = cnt + (is_alive ? 4'd1 : 4'd0);
                     
                     if (final_count <= 4'd1 || final_count >= 4'd4)
-                        buffer0[compute_idx] <= 8'd0;
+                        buffer0[compute_idx] <= 1'b0;
                     else if (final_count == 4'd2)
-                        buffer0[compute_idx] <= buffer1[compute_idx];
+                        buffer0[compute_idx] <= current_cell;
                     else // final_count == 3
-                        buffer0[compute_idx] <= 8'd255;
+                        buffer0[compute_idx] <= 1'b1;
                 end
                 else begin
                     // Middle neighbors - accumulate
@@ -74,21 +75,22 @@ module gol#(
             end
             else begin
                 // Read from buffer0, write to buffer1
-                is_alive = (buffer0[check_idx] != 8'd0);
+                is_alive = buffer0[check_idx];
                 
                 if (neighbor_idx == 3'd0) begin
                     cnt <= is_alive ? 4'd1 : 4'd0;
+                    current_cell <= buffer0[compute_idx];
                 end
                 else if (neighbor_idx == 3'd7) begin
                     logic [3:0] final_count;
                     final_count = cnt + (is_alive ? 4'd1 : 4'd0);
                     
                     if (final_count <= 4'd1 || final_count >= 4'd4)
-                        buffer1[compute_idx] <= 8'd0;
+                        buffer1[compute_idx] <= 1'b0;
                     else if (final_count == 4'd2)
-                        buffer1[compute_idx] <= buffer0[compute_idx];
+                        buffer1[compute_idx] <= current_cell;
                     else // final_count == 3
-                        buffer1[compute_idx] <= 8'd255;
+                        buffer1[compute_idx] <= 1'b1;
                 end
                 else begin
                     cnt <= cnt + (is_alive ? 4'd1 : 4'd0);
@@ -97,8 +99,8 @@ module gol#(
         end
     end
 
-    // always output the data 
+    // always output the data (convert 1-bit to 8-bit for display)
     always_ff @(posedge clk) begin
-        data <= buffer_select ? buffer1[address] : buffer0[address];
+        data <= (buffer_select ? buffer1[address] : buffer0[address]) ? 8'd255 : 8'd0;
     end
 endmodule

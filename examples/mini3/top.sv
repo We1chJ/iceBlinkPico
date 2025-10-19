@@ -46,27 +46,29 @@ module top(
         .data       (red_data)
     );
 
-    // gol #(
-    //     .INIT_FILE ("spiral/green.txt")
-    // ) u2 (
-    //     .clk        (clk),
-    //     .address    (pixel),
-    //     .computing  (computing),
-    //     .compute_idx(compute_idx),
-    //     .buffer_select(buffer_select),
-    //     .data       (green_data)
-    // );
+    gol #(
+        .INIT_FILE ("spiral/green.txt")
+    ) u2 (
+        .clk        (clk),
+        .address    (pixel),
+        .computing  (computing),
+        .compute_idx(compute_idx),
+        .buffer_select(buffer_select),
+        .neighbor_idx(neighbor_idx),
+        .data       (green_data)
+    );
 
-    // gol #(
-    //     .INIT_FILE ("spiral/blue.txt")
-    // ) u3 (
-    //     .clk        (clk),
-    //     .address    (pixel),
-    //     .computing  (computing),
-    //     .compute_idx(compute_idx),
-    //     .buffer_select(buffer_select),
-    //     .data       (blue_data)
-    // );
+    gol #(
+        .INIT_FILE ("spiral/blue.txt")
+    ) u3 (
+        .clk        (clk),
+        .address    (pixel),
+        .computing  (computing),
+        .compute_idx(compute_idx),
+        .buffer_select(buffer_select),
+        .neighbor_idx(neighbor_idx),
+        .data       (blue_data)
+    );
 
     // Instance the WS2812B output driver
     ws2812b u4 (
