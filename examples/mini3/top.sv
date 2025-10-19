@@ -21,8 +21,11 @@ module top(
 
     // Requires 2 buffers to avoid modifying the matrix being displayed directly
     logic buffer_select = 1'b0;
-    logic [7:0] buffer0 [0:63];
-    logic [7:0] buffer1 [0:63];
+    logic [7:0] red_buffer0 [0:63];
+    logic [7:0] red_buffer1 [0:63];
+
+    logic [7:0] green_buffer0 [0:63];
+    logic [7:0] green_buffer1 [0:63];
 
     logic [23:0] shift_reg = 24'd0;
     logic load_sreg;
@@ -41,12 +44,15 @@ module top(
 
     // Initialize both buffers for cur frame and next frame
     initial begin
-        $readmemh("spiral/red.txt", buffer0);
-        $readmemh("spiral/red.txt", buffer1);
+        $readmemh("spiral/red.txt", red_buffer0);
+        $readmemh("spiral/red.txt", red_buffer1);
+        $readmemh("spiral/green.txt", green_buffer0);
+        $readmemh("spiral/green.txt", green_buffer1);
     end
 
     always_ff @(posedge clk) begin
-        red_data <= buffer_select ? buffer1[address] : buffer0[address];
+        red_data <= buffer_select ? red_buffer1[address] : red_buffer0[address];
+        green_data <= buffer_select ? green_buffer1[address] : green_buffer0[address];
     end
     
     // Sequential computation - one cell per clock cycle
@@ -68,42 +74,42 @@ module top(
             cnt = 0;
             
             if (buffer_select) begin
-                // Read from buffer1, write to buffer0
+                // Read from red_buffer1, write to red_buffer0
                 // Cardinal neighbors
-                if (buffer1[i*8 + ((j+1) % 8)] != 8'd0) cnt = cnt + 1;
-                if (buffer1[i*8 + ((j+7) % 8)] != 8'd0) cnt = cnt + 1;
-                if (buffer1[((i+1) % 8) * 8 + j] != 8'd0) cnt = cnt + 1;
-                if (buffer1[((i+7) % 8) * 8 + j] != 8'd0) cnt = cnt + 1;
+                if (red_buffer1[i*8 + ((j+1) % 8)] != 8'd0) cnt = cnt + 1;
+                if (red_buffer1[i*8 + ((j+7) % 8)] != 8'd0) cnt = cnt + 1;
+                if (red_buffer1[((i+1) % 8) * 8 + j] != 8'd0) cnt = cnt + 1;
+                if (red_buffer1[((i+7) % 8) * 8 + j] != 8'd0) cnt = cnt + 1;
                 // Diagonal neighbors
-                if (buffer1[((i+7) % 8) * 8 + ((j+7) % 8)] != 8'd0) cnt = cnt + 1;
-                if (buffer1[((i+7) % 8) * 8 + ((j+1) % 8)] != 8'd0) cnt = cnt + 1;
-                if (buffer1[((i+1) % 8) * 8 + ((j+7) % 8)] != 8'd0) cnt = cnt + 1;
-                if (buffer1[((i+1) % 8) * 8 + ((j+1) % 8)] != 8'd0) cnt = cnt + 1;
+                if (red_buffer1[((i+7) % 8) * 8 + ((j+7) % 8)] != 8'd0) cnt = cnt + 1;
+                if (red_buffer1[((i+7) % 8) * 8 + ((j+1) % 8)] != 8'd0) cnt = cnt + 1;
+                if (red_buffer1[((i+1) % 8) * 8 + ((j+7) % 8)] != 8'd0) cnt = cnt + 1;
+                if (red_buffer1[((i+1) % 8) * 8 + ((j+1) % 8)] != 8'd0) cnt = cnt + 1;
 
                 if (cnt <= 1 || cnt >= 4)
-                    buffer0[compute_idx] <= 8'd0;
+                    red_buffer0[compute_idx] <= 8'd0;
                 else if (cnt == 2)
-                    buffer0[compute_idx] <= buffer1[compute_idx];
+                    red_buffer0[compute_idx] <= red_buffer1[compute_idx];
                 else // cnt == 3
-                    buffer0[compute_idx] <= 8'd255;
+                    red_buffer0[compute_idx] <= 8'd255;
             end
             else begin
-                // Read from buffer0, write to buffer1
-                if (buffer0[i*8 + ((j+1) % 8)] != 8'd0) cnt = cnt + 1;
-                if (buffer0[i*8 + ((j+7) % 8)] != 8'd0) cnt = cnt + 1;
-                if (buffer0[((i+1) % 8) * 8 + j] != 8'd0) cnt = cnt + 1;
-                if (buffer0[((i+7) % 8) * 8 + j] != 8'd0) cnt = cnt + 1;
-                if (buffer0[((i+7) % 8) * 8 + ((j+7) % 8)] != 8'd0) cnt = cnt + 1;
-                if (buffer0[((i+7) % 8) * 8 + ((j+1) % 8)] != 8'd0) cnt = cnt + 1;
-                if (buffer0[((i+1) % 8) * 8 + ((j+7) % 8)] != 8'd0) cnt = cnt + 1;
-                if (buffer0[((i+1) % 8) * 8 + ((j+1) % 8)] != 8'd0) cnt = cnt + 1;
+                // Read from red_buffer0, write to red_buffer1
+                if (red_buffer0[i*8 + ((j+1) % 8)] != 8'd0) cnt = cnt + 1;
+                if (red_buffer0[i*8 + ((j+7) % 8)] != 8'd0) cnt = cnt + 1;
+                if (red_buffer0[((i+1) % 8) * 8 + j] != 8'd0) cnt = cnt + 1;
+                if (red_buffer0[((i+7) % 8) * 8 + j] != 8'd0) cnt = cnt + 1;
+                if (red_buffer0[((i+7) % 8) * 8 + ((j+7) % 8)] != 8'd0) cnt = cnt + 1;
+                if (red_buffer0[((i+7) % 8) * 8 + ((j+1) % 8)] != 8'd0) cnt = cnt + 1;
+                if (red_buffer0[((i+1) % 8) * 8 + ((j+7) % 8)] != 8'd0) cnt = cnt + 1;
+                if (red_buffer0[((i+1) % 8) * 8 + ((j+1) % 8)] != 8'd0) cnt = cnt + 1;
 
                 if (cnt <= 1 || cnt >= 4)
-                    buffer1[compute_idx] <= 8'd0;
+                    red_buffer1[compute_idx] <= 8'd0;
                 else if (cnt == 2)
-                    buffer1[compute_idx] <= buffer0[compute_idx];
+                    red_buffer1[compute_idx] <= red_buffer0[compute_idx];
                 else // cnt == 3
-                    buffer1[compute_idx] <= 8'd255;
+                    red_buffer1[compute_idx] <= 8'd255;
             end
             
             // Move to next cell or finish
@@ -139,6 +145,7 @@ module top(
     // Load shift register with pixel data
     always_ff @(posedge clk) begin
         if (load_sreg) begin
+            // shift_reg <= { green_data, red_data, 8'd0 };
             shift_reg <= { 8'd0, red_data, 8'd0 };
         end
         else if (shift) begin
