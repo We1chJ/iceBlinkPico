@@ -50,15 +50,17 @@ module top(
     end
     
     // Sequential computation - one cell per clock cycle
+    // This will take 64 clock cycles to finish computing the next frame
+    // which is enough because the IDLE cycles are long enough > 64
     always_ff @(posedge clk) begin
         next_frame_prev <= next_frame;
         
         // Start computing on rising edge of next_frame
+        // runs only once for initializing the computing counter
         if (next_frame && !next_frame_prev && !computing) begin
             computing <= 1'b1;
             compute_idx <= 6'd0;
         end
-        // Continue computing
         else if (computing) begin
             integer i, j, cnt;
             i = compute_idx / 8;
@@ -87,12 +89,10 @@ module top(
             end
             else begin
                 // Read from buffer0, write to buffer1
-                // Cardinal neighbors
                 if (buffer0[i*8 + ((j+1) % 8)] != 8'd0) cnt = cnt + 1;
                 if (buffer0[i*8 + ((j+7) % 8)] != 8'd0) cnt = cnt + 1;
                 if (buffer0[((i+1) % 8) * 8 + j] != 8'd0) cnt = cnt + 1;
                 if (buffer0[((i+7) % 8) * 8 + j] != 8'd0) cnt = cnt + 1;
-                // Diagonal neighbors
                 if (buffer0[((i+7) % 8) * 8 + ((j+7) % 8)] != 8'd0) cnt = cnt + 1;
                 if (buffer0[((i+7) % 8) * 8 + ((j+1) % 8)] != 8'd0) cnt = cnt + 1;
                 if (buffer0[((i+1) % 8) * 8 + ((j+7) % 8)] != 8'd0) cnt = cnt + 1;
@@ -109,6 +109,7 @@ module top(
             // Move to next cell or finish
             if (compute_idx == 6'd63) begin
                 computing <= 1'b0;
+                // flip the buffer 
                 buffer_select <= ~buffer_select;
             end
             else begin
