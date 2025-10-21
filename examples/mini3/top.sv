@@ -28,6 +28,9 @@ module top(
 
     logic next_frame;
     logic next_frame_prev = 1'b0;
+
+    // used to trigger switching of buffers of displays from current frame to next frame
+    logic buffer_select = 1'b0;
     
     // State machine for sequential processing
     logic computing = 1'b0;

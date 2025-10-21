@@ -4,7 +4,7 @@ module controller (
     output logic load_sreg, 
     output logic transmit_pixel, 
     output logic [5:0] pixel, 
-    output logic next_frame,
+    output logic next_frame
 );
 
     localparam TRANSMIT_FRAME       = 1'b0;
@@ -79,12 +79,6 @@ module controller (
     always_ff @(negedge clk) begin
         if ((state == TRANSMIT_FRAME) && transmit_pixel_done) begin
             pixel_counter <= pixel_counter + 1;
-        end
-    end
-
-    always_ff @(negedge clk) begin
-        if (idle_done) begin
-            frame_counter <= frame_counter + 1;
         end
     end
 
