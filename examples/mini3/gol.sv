@@ -24,16 +24,19 @@ module gol#(
     logic [3:0] cnt = 4'd0;
     logic current_cell;
 
+    // storing row and col index
+    logic [2:0] i;
+    logic [2:0] j;
+
     // counting all neighbors in one cycle would exceed FPGA resources
     // therefore we will the neighbor in each clock cycle
     // overall for one color, this would take 64 * 8 clock cycles
     always_ff @(posedge clk) begin
         if (computing) begin
-            integer i, j;
             logic [5:0] check_idx;
             logic is_alive;
-            i = compute_idx / 8;
-            j = compute_idx % 8;
+            i = compute_idx[5:3];
+            j = compute_idx[2:0];
             
             // Determine which neighbor to check
             unique case (neighbor_idx)
