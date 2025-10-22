@@ -27,14 +27,19 @@ module gol#(
     // storing row and col index
     logic [2:0] i;
     logic [2:0] j;
+    // final count of neighbors
+    logic [2:0] final_count;
+
+    // index to check for neighbor
+    logic [5:0] check_idx;
+    // flag to see if the cell being checked is 1 or 0
+    logic is_alive;
 
     // counting all neighbors in one cycle would exceed FPGA resources
     // therefore we will the neighbor in each clock cycle
     // overall for one color, this would take 64 * 8 clock cycles
     always_ff @(posedge clk) begin
         if (computing) begin
-            logic [5:0] check_idx;
-            logic is_alive;
             i = compute_idx[5:3];
             j = compute_idx[2:0];
             
@@ -61,7 +66,6 @@ module gol#(
                 end
                 else if (neighbor_idx == 3'd7) begin
                     // Last neighbor - add to count first, THEN apply rules
-                    logic [3:0] final_count;
                     final_count = cnt + (is_alive ? 4'd1 : 4'd0);
                     
                     if (final_count <= 4'd1 || final_count >= 4'd4)
@@ -85,7 +89,6 @@ module gol#(
                     current_cell <= buffer0[compute_idx];
                 end
                 else if (neighbor_idx == 3'd7) begin
-                    logic [3:0] final_count;
                     final_count = cnt + (is_alive ? 4'd1 : 4'd0);
                     
                     if (final_count <= 4'd1 || final_count >= 4'd4)

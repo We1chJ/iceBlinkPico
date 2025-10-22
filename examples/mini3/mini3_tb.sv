@@ -19,7 +19,7 @@ module mini3_tb;
     initial begin
         $dumpfile("mini3_tb.vcd");
         $dumpvars(0, mini3_tb);
-        #10000000
+        #100000000
         $finish;
     end
 
