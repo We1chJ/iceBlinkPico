@@ -19,6 +19,13 @@ module mini3_tb;
     initial begin
         $dumpfile("mini3_tb.vcd");
         $dumpvars(0, mini3_tb);
+        
+        // Dump gol buffers for red gol instance (u1)
+        for (int i = 0; i < 64; i++) begin
+            $dumpvars(0, u0.u1.buffer0[i]);
+            $dumpvars(0, u0.u1.buffer1[i]);
+        end
+        
         #100000000
         $finish;
     end
