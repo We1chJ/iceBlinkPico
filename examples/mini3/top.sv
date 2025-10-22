@@ -1,4 +1,3 @@
-`include "memory.sv"
 `include "ws2812b.sv"
 `include "controller.sv"
 `include "gol.sv"
